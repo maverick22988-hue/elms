@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!-- ============================================================
+  ELMS — apply.html · Branded public wrapper for the loan
+  application form. Lives on GitHub Pages beside the field PWA.
+  SETUP (one time): paste your Apps Script /exec URL into EXEC below.
+  Links look like:  .../apply.html?t=INVITETOKEN
+  (Set the Settings key PublicApplyBase to this page's full URL and
+   ELMS builds wrapped links + QR codes automatically.)
+============================================================ -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Loan Application · ERMANO Lending</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{--royal:#0F4C81;--royal-dk:#0A3560;--gold:#D4AF37}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{font-family:'Poppins',system-ui,-apple-system,sans-serif;background:#F2F6FA;display:flex;flex-direction:column}
+  header{background:linear-gradient(135deg,var(--royal),var(--royal-dk));color:#fff;
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:12px;
+    border-bottom:3px solid var(--gold);flex-shrink:0}
+  header img{width:38px;height:38px;border-radius:9px;background:#fff;object-fit:contain;padding:3px}
+  header .t b{display:block;font-size:15.5px;letter-spacing:.4px}
+  header .t span{font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;opacity:.85}
+  main{flex:1;position:relative}
+  iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+  .veil{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;
+    justify-content:center;background:#F2F6FA;color:#5A6B7D;font-size:14px;text-align:center;padding:24px}
+  .spin{width:34px;height:34px;border:3px solid #D4DCE5;border-top-color:var(--royal);
+    border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .err{color:#C0392B;font-weight:600;max-width:420px;line-height:1.6}
+  footer{flex-shrink:0;text-align:center;font-size:10.5px;color:#8FA0B0;
+    padding:7px 12px calc(7px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #E3E9F0}
+</style>
+</head>
+<body>
+<header>
+  <img src="icon-192.png" alt="">
+  <div class="t"><b>ERMANO LENDING CORPORATION</b><span>Digital Loan Application</span></div>
+</header>
+<main>
+  <div class="veil" id="veil"><div class="spin"></div><div>Opening your secure application…</div></div>
+  <iframe id="frame" title="Loan application form" allow="camera; geolocation"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads" hidden></iframe>
+</main>
+<footer>Secure application · Your information is handled under RA 10173 (Data Privacy Act)</footer>
+<script>
+(function(){
+  'use strict';
+  /* ▼▼ ONE-TIME SETUP: paste your Apps Script web-app /exec URL here ▼▼ */
+  var EXEC = 'https://script.google.com/macros/s/AKfycbwgLHkW38qzzAt1lXQjAHPGXpKZ1XBuNhgNJ6WketmIbvTiQGj1lvuLetF_IX2l2jDx/exec';
+  /* ▲▲ e.g. https://script.google.com/macros/s/AKfyc.../exec           ▲▲ */
+
+  var q = new URLSearchParams(location.search);
+  var t = (q.get('t') || q.get('apply') || '').trim();
+  var veil = document.getElementById('veil');
+  var frame = document.getElementById('frame');
+
+  function fail(msg){ veil.innerHTML = '<div class="err">' + msg + '</div>'; }
+
+  if (EXEC.indexOf('https://script.google.com/') !== 0)
+    return fail('This page is not configured yet — the administrator must set the application URL inside apply.html.');
+  if (!t)
+    return fail('This link is missing its invitation code. Please use the exact link or QR code your loan officer shared with you.');
+
+  frame.src = EXEC + '?apply=' + encodeURIComponent(t);
+  frame.hidden = false;
+  var shown = false;
+  frame.addEventListener('load', function(){
+    if (shown) return; shown = true;
+    veil.style.display = 'none';
+  });
+  /* if Google blocks the embed for any reason, fall through gracefully */
+  setTimeout(function(){
+    if (shown) return;
+    veil.innerHTML = '<div class="err">Taking longer than usual…</div>' +
+      '<a href="' + EXEC + '?apply=' + encodeURIComponent(t) +
+      '" style="color:#0F4C81;font-weight:600">Tap here to open the application directly</a>';
+  }, 12000);
+})();
+</script>
+</body>
+</html>

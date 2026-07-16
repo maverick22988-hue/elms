@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F4C81">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>ELMS Field</title>
+<style>
+:root{--royal:#0F4C81;--royal-deep:#0A3A64;--gold:#D4AF37;--ink:#1C2B3A;--slate:#64748B;
+  --line:#E2E8F0;--green:#1E8E5A;--green-bg:#E9F7F0;--red:#C0392B;--red-bg:#FBEEEC;--amber:#B7791F}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#F4F7FB;color:var(--ink);
+  font-size:15px;padding-bottom:env(safe-area-inset-bottom)}
+.hidden{display:none!important}
+/* header */
+header{background:linear-gradient(140deg,var(--royal-deep),var(--royal));color:#fff;
+  padding:14px 16px calc(14px);display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+header img{width:38px;height:38px;border-radius:50%;background:#fff;border:2px solid var(--gold)}
+header h1{font-size:16px;letter-spacing:.02em}header p{font-size:11px;color:var(--gold)}
+header .sp{flex:1}
+.chip{border:none;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;font-family:inherit}
+.chip--sync{background:#FFF3D6;color:var(--amber)}
+.chip--err{background:#FFDDD6;color:var(--red)}
+.chip--ok{background:rgba(255,255,255,.15);color:#fff}
+main{padding:14px;max-width:560px;margin:0 auto}
+.banner{border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+.banner--off{background:#FFF3D6;color:var(--amber);font-weight:600}
+.banner--info{background:#E8F0F9;color:var(--royal)}
+/* cards */
+.card{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;
+  box-shadow:0 1px 3px rgba(16,42,67,.06)}
+.card h3{font-size:15px}.mut{color:var(--slate);font-size:12px}
+.num{font-variant-numeric:tabular-nums}
+.row{display:flex;gap:10px;align-items:center}
+.btn{border:none;border-radius:10px;padding:12px 14px;font-size:14px;font-weight:700;font-family:inherit;width:100%}
+.btn--go{background:var(--royal);color:#fff}
+.btn--gold{background:var(--gold);color:var(--royal-deep)}
+.btn--ghost{background:#fff;color:var(--royal);border:1.5px solid var(--line)}
+.btn--sm{width:auto;padding:9px 12px;font-size:12.5px}
+.btn--green{background:var(--green);color:#fff}
+.btn--red{background:var(--red);color:#fff}
+.btn:disabled{opacity:.5}
+input,select,textarea{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;
+  font-size:15px;font-family:inherit;background:#fff}
+label{font-size:12px;font-weight:600;color:var(--slate);display:block;margin:12px 0 5px}
+.badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px}
+.b-q{background:#FFF3D6;color:var(--amber)}.b-c{background:var(--green-bg);color:var(--green)}
+.b-o{background:var(--red-bg);color:var(--red)}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,30,50,.55);display:none;z-index:50;align-items:flex-end}
+.scrim.show{display:flex}
+.sheet{background:#fff;border-radius:18px 18px 0 0;width:100%;max-height:88vh;overflow:auto;padding:18px 18px 26px}
+.sheet h2{font-size:17px;margin-bottom:2px}
+.grabber{width:44px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 12px}
+.toast{position:fixed;left:12px;right:12px;bottom:16px;background:var(--ink);color:#fff;border-radius:12px;
+  padding:13px 16px;font-size:13.5px;z-index:99;box-shadow:0 6px 24px rgba(0,0,0,.3);display:none}
+.toast.err{background:var(--red)}
+/* pin pad */
+.pin{display:flex;gap:10px;justify-content:center;margin:18px 0}
+.pin i{width:14px;height:14px;border-radius:50%;border:2px solid var(--royal);display:block}
+.pin i.on{background:var(--royal)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:280px;margin:0 auto}
+.pad button{aspect-ratio:1.5;font-size:20px;font-weight:700;border:1.5px solid var(--line);border-radius:12px;
+  background:#fff;font-family:inherit}
+.center{text-align:center}
+.rcpt{border:2px dashed var(--gold);border-radius:14px;padding:18px;text-align:center;background:#FFFDF5}
+.rcpt .amt{font-size:34px;font-weight:800;color:var(--royal)}
+.watermark{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--amber)}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.seg button{flex:1;padding:10px;border:none;background:#fff;font-weight:700;font-size:13px;font-family:inherit;color:var(--slate)}
+.seg button.on{background:var(--royal);color:#fff}
+</style>
+</head>
+<body>
+
+<header>
+  <img src="icon-192.png" alt="">
+  <div><h1>ELMS Field</h1><p id="hSub">ERMANO Lending</p></div>
+  <span class="sp"></span>
+  <button class="chip chip--ok hidden" id="chipNet">●</button>
+  <button class="chip chip--sync hidden" id="chipSync" onclick="App.chipTap()">⏳ 0</button>
+</header>
+
+<main>
+  <!-- SETUP -->
+  <section id="vSetup" class="hidden">
+    <div class="card">
+      <h3>Set up this device</h3>
+      <p class="mut">One-time. Your admin must approve this phone before it can work.</p>
+      <label>ELMS server URL (/exec)</label><input id="suUrl" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off">
+      <label>Your ELMS username</label><input id="suUser" autocapitalize="off">
+      <label>Password</label><input id="suPass" type="password">
+      <label>Device name</label><input id="suLabel" placeholder="e.g. RT's phone">
+      <label>Create a 6-digit PIN (unlocks this app; 5 wrong tries wipes it)</label>
+      <input id="suPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*">
+      <div style="margin-top:16px"><button class="btn btn--go" id="suBtn" onclick="App.setup()">Register this device</button></div>
+      <p class="mut" style="margin-top:10px">Your password is used once for registration and login — it is never stored on this phone.</p>
+    </div>
+  </section>
+
+  <!-- PENDING -->
+  <section id="vPending" class="hidden">
+    <div class="card center">
+      <h3>⏳ Waiting for approval</h3>
+      <p class="mut" style="margin:8px 0 14px">Device <b id="pdId">—</b> is registered as <b>Pending</b>.<br>
+      Ask your admin: <b>Admin → Devices → Approve</b>. Then come back and tap below.</p>
+      <label>Password (to sign in once approved)</label><input id="pdPass" type="password">
+      <div style="margin-top:12px"><button class="btn btn--go" onclick="App.pendingCheck()">Check approval &amp; sign in</button></div>
+    </div>
+  </section>
+
+  <!-- PIN UNLOCK -->
+  <section id="vPin" class="hidden">
+    <div class="card center">
+      <h3>Enter PIN</h3>
+      <p class="mut" id="pinMsg">Unlock ELMS Field</p>
+      <div class="pin" id="pinDots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pad" id="pinPad"></div>
+    </div>
+  </section>
+
+  <!-- LOGIN (session expired) -->
+  <section id="vLogin" class="hidden">
+    <div class="card">
+      <h3>Sign in</h3>
+      <p class="mut">Your session expired. Sign in once while online — offline work continues after.</p>
+      <label>Username</label><input id="liUser" autocapitalize="off">
+      <label>Password</label><input id="liPass" type="password">
+      <div style="margin-top:14px"><button class="btn btn--go" id="liBtn" onclick="App.login()">Sign in</button></div>
+    </div>
+  </section>
+
+  <!-- HOME / ROUTE -->
+  <section id="vHome" class="hidden">
+    <div id="homeBanner"></div>
+    <div class="row" style="margin-bottom:12px">
+      <input id="q" placeholder="🔍 Search name, loan, area…" oninput="App.renderRoute()">
+      <button class="btn btn--ghost btn--sm" onclick="App.pull(true)">↻</button>
+    </div>
+    <div id="routeList"><div class="card center mut">No route yet — tap ↻ while online.</div></div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn btn--ghost" onclick="App.openExpense()">+ Expense</button>
+      <button class="btn btn--ghost hidden" id="btnBrw" onclick="App.openBorrower()">+ Borrower</button>
+      <button class="btn btn--ghost hidden" id="btnApp" onclick="App.openApp()">+ Loan appl.</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn--ghost" onclick="App.show('vReceipts');App.renderReceipts()">Receipts</button>
+      <button class="btn btn--ghost" onclick="App.show('vAbout');App.renderAbout()">⚙</button>
+    </div>
+  </section>
+
+  <!-- RECEIPTS -->
+  <section id="vReceipts" class="hidden">
+    <button class="btn btn--ghost btn--sm" onclick="App.show('vHome')">‹ Back</button>
+    <h3 style="margin:12px 0 8px">Receipts issued on this phone</h3>
+    <div id="rcptList"></div>
+  </section>
+
+  <!-- ABOUT / STATUS -->
+  <section id="vAbout" class="hidden">
+    <button class="btn btn--ghost btn--sm" onclick="App.show('vHome')">‹ Back</button>
+    <div class="card" id="aboutBox" style="margin-top:12px"></div>
+    <button class="btn btn--red" onclick="App.selfWipe()">Erase this device's local data</button>
+  </section>
+</main>
+
+<!-- COLLECT SHEET -->
+<div class="scrim" id="mCollect"><div class="sheet">
+  <div class="grabber"></div>
+  <h2 id="cName">—</h2><p class="mut" id="cMeta">—</p>
+  <label>Amount received (₱)</label><input id="cAmt" type="number" inputmode="decimal" step="0.01">
+  <label>Method</label><select id="cMethod"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank</option></select>
+  <label>Reference / note</label><input id="cRef">
+  <label>Borrower signature (optional)</label>
+  <canvas id="sigPad" width="600" height="200" style="width:100%;height:110px;border:1.5px dashed var(--line);border-radius:10px;background:#fff;touch-action:none"></canvas>
+  <button class="btn btn--ghost btn--sm" style="margin-top:6px" onclick="Sig.clear()">Clear signature</button>
+  <div class="row" style="margin-top:16px">
+    <button class="btn btn--ghost" onclick="App.close('mCollect')">Cancel</button>
+    <button class="btn btn--gold" id="cBtn" onclick="App.collect()">Collect &amp; issue receipt</button>
+  </div>
+</div></div>
+
+<!-- PROVISIONAL RECEIPT -->
+<div class="scrim" id="mRcpt"><div class="sheet">
+  <div class="grabber"></div>
+  <div class="rcpt">
+    <div class="watermark">★ PROVISIONAL RECEIPT ★</div>
+    <div class="amt" id="rAmt">₱0.00</div>
+    <div id="rName" style="font-weight:700;margin:4px 0">—</div>
+    <div class="mut" id="rMeta">—</div>
+    <div style="font-size:15px;font-weight:800;margin-top:10px" id="rNo">PRV-…</div>
+    <div class="mut" style="margin-top:8px">Official OR number follows automatically after sync.<br>Collector: <span id="rWho">—</span></div>
+  </div>
+  <div style="margin-top:14px"><button class="btn btn--go" onclick="App.close('mRcpt')">Done</button></div>
+</div></div>
+
+<!-- OUTCOME / PTP SHEET -->
+<div class="scrim" id="mVisit"><div class="sheet">
+  <div class="grabber"></div>
+  <h2 id="vName">—</h2>
+  <div class="seg" style="margin-top:10px">
+    <button id="segOut" class="on" onclick="App.visitMode('out')">Outcome</button>
+    <button id="segPtp" onclick="App.visitMode('ptp')">Promise to pay</button>
+  </div>
+  <div id="visitOut">
+    <label>What happened?</label>
+    <select id="oType"><option>Not Home</option><option>Refused</option><option>Will Pay Later Today</option>
+      <option>Moved</option><option>Business Closed</option><option>Other</option></select>
+    <label>Note</label><input id="oNote">
+  </div>
+  <div id="visitPtp" class="hidden">
+    <label>Promised date</label><input id="pDate" type="date">
+    <label>Amount promised (₱)</label><input id="pAmt" type="number" inputmode="decimal">
+    <label>Note</label><input id="pNote">
+  </div>
+  <div class="row" style="margin-top:16px">
+    <button class="btn btn--ghost" onclick="App.close('mVisit')">Cancel</button>
+    <button class="btn btn--go" onclick="App.visitSave()">Record</button>
+  </div>
+</div></div>
+
+<!-- EXPENSE SHEET -->
+<div class="scrim" id="mExp"><div class="sheet">
+  <div class="grabber"></div>
+  <h2>Log expense</h2>
+  <label>Category</label>
+  <select id="eCat"><option>Gas</option><option>Motor Maintenance</option><option>Motorcycle Rental</option>
+    <option>Office Supplies</option><option>Fuel</option><option>Meals</option><option>Load/Data</option><option>Others</option></select>
+  <label>Amount (₱)</label><input id="eAmt" type="number" inputmode="decimal">
+  <label>Note</label><input id="eNote">
+  <div class="row" style="margin-top:16px">
+    <button class="btn btn--ghost" onclick="App.close('mExp')">Cancel</button>
+    <button class="btn btn--go" onclick="App.expense()">Log</button>
+  </div>
+</div></div>
+
+<!-- NEW BORROWER SHEET -->
+<div class="scrim" id="mBrw"><div class="sheet">
+  <div class="grabber"></div>
+  <h2>Register borrower</h2>
+  <p class="mut">Gets a real BOR- number at sync. Possible duplicates are flagged to the office, never auto-merged.</p>
+  <label>First name *</label><input id="bFirst">
+  <label>Last name *</label><input id="bLast">
+  <label>Mobile</label><input id="bMobile" inputmode="tel">
+  <label>Address</label><input id="bAddr">
+  <label>Area</label><input id="bArea" placeholder="e.g. Bulacao">
+  <label>Photo (optional)</label>
+  <input type="file" id="bPhoto" accept="image/*" capture="environment" style="padding:9px">
+  <div class="row" style="margin-top:16px">
+    <button class="btn btn--ghost" onclick="App.close('mBrw')">Cancel</button>
+    <button class="btn btn--go" onclick="App.borrowerSave()">Register</button>
+  </div>
+</div></div>
+
+<!-- NEW APPLICATION SHEET -->
+<div class="scrim" id="mApp"><div class="sheet">
+  <div class="grabber"></div>
+  <h2>Loan application (draft)</h2>
+  <p class="mut">Lands in the office as a Draft — approval and release stay in ELMS, as designed.</p>
+  <label>Borrower</label><select id="aWho"></select>
+  <div id="aManualWrap" class="hidden"><label>Borrower ID</label><input id="aManual" placeholder="BOR-000123" autocapitalize="characters"></div>
+  <label>Product</label><select id="aProd"></select>
+  <label>Amount applied (₱)</label><input id="aAmt" type="number" inputmode="decimal">
+  <label>Term (number of payments)</label><input id="aTerm" type="number" inputmode="numeric">
+  <label>Purpose</label><input id="aPurp">
+  <div class="row" style="margin-top:16px">
+    <button class="btn btn--ghost" onclick="App.close('mApp')">Cancel</button>
+    <button class="btn btn--go" onclick="App.appSave()">Queue application</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   ELMS Field PWA — Phase 2 core
+   Vault: ALL state lives in ONE AES-GCM-encrypted blob in IndexedDB,
+   decrypted into memory by the PIN. Nothing readable at rest.
+   DEFAULTS PENDING ERMANO RULINGS:
+     PROVISIONAL_RECEIPTS = true   (§7 of the architecture — accountant/BIR)
+     Session lifetime = server default; expired → re-login when online.
+===================================================================== */
+'use strict';
+const PROVISIONAL_RECEIPTS = true;
+
+/* ---------- tiny IndexedDB (one key) ---------- */
+const IDB = {
+  db: null,
+  open(){ return new Promise((res,rej)=>{ const r=indexedDB.open('elmsfield',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+    r.onsuccess=()=>{IDB.db=r.result;res();}; r.onerror=()=>rej(r.error); }); },
+  get(k){ return new Promise((res,rej)=>{ const t=IDB.db.transaction('kv').objectStore('kv').get(k);
+    t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error); }); },
+  set(k,v){ return new Promise((res,rej)=>{ const t=IDB.db.transaction('kv','readwrite').objectStore('kv').put(v,k);
+    t.onsuccess=()=>res(); t.onerror=()=>rej(t.error); }); },
+  del(k){ return new Promise((res,rej)=>{ const t=IDB.db.transaction('kv','readwrite').objectStore('kv').delete(k);
+    t.onsuccess=()=>res(); t.onerror=()=>rej(t.error); }); }
+};
+
+/* ---------- crypto: PIN → PBKDF2 → AES-GCM ---------- */
+const Vault = {
+  key: null,
+  async derive(pin, salt){
+    const mat = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:120000, hash:'SHA-256'},
+      mat, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+  },
+  async init(pin){                       // first time: new salt + verifier
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    Vault.key = await Vault.derive(pin, salt);
+    await IDB.set('salt', salt);
+    await IDB.set('tries', 0);
+  },
+  async unlock(pin){
+    const salt = await IDB.get('salt'); if(!salt) return 'nosalt';
+    const key = await Vault.derive(pin, salt);
+    const blob = await IDB.get('vault');
+    if(!blob){ Vault.key=key; return true; }  // empty vault, accept
+    try{
+      const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:blob.iv}, key, blob.ct);
+      Vault.key = key;
+      App.S = JSON.parse(new TextDecoder().decode(plain));
+      await IDB.set('tries', 0);
+      return true;
+    }catch(e){
+      let n = ((await IDB.get('tries'))||0)+1;
+      await IDB.set('tries', n);
+      if(n>=5){ await App.nuke(); return 'wiped'; }
+      return 6-n;                        // tries left
+    }
+  },
+  async persist(){
+    if(!Vault.key) return;
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, Vault.key,
+      new TextEncoder().encode(JSON.stringify(App.S)));
+    await IDB.set('vault', {iv, ct});
+  }
+};
+
+/* ---------- the app ---------- */
+const App = {
+  S: null,          // decrypted state: {cfg:{url,deviceId,deviceToken,user,token,userName}, seq, route, asOf, outbox:[], receipts:[]}
+  pinBuf: '', pinMode: 'unlock', busy:false, backoff:0, timer:null, current:null,
+
+  async boot(){
+    await IDB.open();
+    if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+    App.padBuild();
+    const salt = await IDB.get('salt');
+    if(!salt){ App.show('vSetup'); }
+    else { App.show('vPin'); }
+    window.addEventListener('online', ()=>{ App.net(); App.drain(); });
+    window.addEventListener('offline', App.net);
+    setInterval(()=>{ if(App.S && App.pend().length) App.drain(); }, 90000);
+    App.net();
+  },
+
+  /* ----- API ----- */
+  async api(action, payload, useAuth){
+    const cfg = App.S ? App.S.cfg : App.tmpCfg;
+    const body = { action, payload: payload||{} };
+    if(App.S){ body.meta={ seq:App.S.seq||0, pend:App.pend().length, ahAttempts:App.S.ahAttempts||0 };
+      if(App.S.ahAttempts){ App.S.ahAttempts=0; Vault.persist(); } }
+    if(cfg.deviceId){ body.deviceId=cfg.deviceId; body.deviceToken=cfg.deviceToken; }
+    if(useAuth!==false && cfg.token) body.token = cfg.token;
+    const r = await fetch(cfg.url, { method:'POST', redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},   // avoids CORS preflight (GAS can't answer OPTIONS)
+      body: JSON.stringify(body) });
+    const j = await r.json();
+    if(j && j.serverTime && App.S){
+      const dev=Date.now();
+      App.S.skew=j.serverTime-dev;                 // corrected now = Date.now()+skew
+      App.S.lastSrv=j.serverTime; App.S.lastDev=dev;
+      const tol=((App.S.duty&&App.S.duty.skewToleranceMin)||5)*60000;
+      App.S.clockBad=Math.abs(App.S.skew)>tol;
+      Vault.persist();
+    }
+    if(j && j.data && j.data.duty && App.S){ App.S.duty=j.data.duty; Vault.persist(); }
+    if(j && j.data && j.data.wipe){ await App.nuke(); location.reload(); throw new Error('wiped'); }
+    return j;
+  },
+
+  /* ----- setup & auth ----- */
+  async setup(){
+    const url=v('suUrl'), user=v('suUser'), pass=v('suPass'), label=v('suLabel'), pin=v('suPin');
+    if(!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) return toast('Enter the full /exec URL.', 1);
+    if(!user||!pass) return toast('Username and password required.', 1);
+    if(!/^\d{6}$/.test(pin)) return toast('PIN must be exactly 6 digits.', 1);
+    bz('suBtn',1);
+    App.tmpCfg = { url };
+    try{
+      const res = await App.api('registerDevice', {username:user, password:pass, label:label||'Field phone'}, false);
+      bz('suBtn',0);
+      if(!res.ok) return toast(res.error||'Registration failed.', 1);
+      await Vault.init(pin);
+      App.S = { cfg:{ url, deviceId:res.data.deviceId, deviceToken:res.data.deviceToken,
+                      user:user, token:'', userName:user, menu:[] },
+                seq:0, route:null, asOf:null, outbox:[], receipts:[], people:[] };
+      await Vault.persist();
+      el('pdId').textContent = res.data.deviceId;
+      App.show('vPending');
+      toast('Registered as '+res.data.deviceId+' — awaiting Admin approval.');
+    }catch(e){ bz('suBtn',0); toast('Cannot reach the server — check the URL and your signal.', 1); }
+  },
+
+  async pendingCheck(){
+    const pass = v('pdPass'); if(!pass) return toast('Enter your password.', 1);
+    try{
+      const res = await App.api('login', {username:App.S.cfg.user, password:pass});
+      if(!res.ok) return toast(res.error||'Not yet.', 1);
+      App.S.cfg.token = res.data.token;
+      App.S.cfg.userName = (res.data.user&&res.data.user.FullName)||App.S.cfg.user;
+      App.S.cfg.menu = res.data.menu||[];
+      await Vault.persist();
+      App.show('vHome'); App.homeUi(); App.pull(true);
+    }catch(e){ toast('Cannot reach the server.', 1); }
+  },
+
+  async login(){
+    const u=v('liUser')||App.S.cfg.user, p=v('liPass');
+    if(!p) return toast('Password required.', 1);
+    bz('liBtn',1);
+    try{
+      const res = await App.api('login', {username:u, password:p});
+      bz('liBtn',0);
+      if(!res.ok) return toast(res.error||'Sign-in failed.', 1);
+      App.S.cfg.user=u; App.S.cfg.token=res.data.token;
+      App.S.cfg.userName=(res.data.user&&res.data.user.FullName)||u;
+      App.S.cfg.menu = res.data.menu||App.S.cfg.menu||[];
+      await Vault.persist();
+      App.show('vHome'); App.homeUi(); App.drain(); App.pull(false);
+    }catch(e){ bz('liBtn',0); toast('Offline — sign in when you have signal. Queued work is safe.', 1); }
+  },
+
+  /* ----- PIN pad ----- */
+  padBuild(){
+    el('pinPad').innerHTML=[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k=>
+      k===''?'<span></span>':'<button onclick="App.pad(\''+k+'\')">'+k+'</button>').join('');
+  },
+  async pad(k){
+    if(k==='⌫') App.pinBuf=App.pinBuf.slice(0,-1);
+    else if(App.pinBuf.length<6) App.pinBuf+=k;
+    [...el('pinDots').children].forEach((d,i)=>d.className=i<App.pinBuf.length?'on':'');
+    if(App.pinBuf.length===6){
+      const pin=App.pinBuf; App.pinBuf='';
+      const r = await Vault.unlock(pin);
+      [...el('pinDots').children].forEach(d=>d.className='');
+      if(r===true){
+        if(!App.S){ App.show('vSetup'); return; }       // salt existed but vault empty
+        App.show('vHome'); App.homeUi(); App.renderRoute(); App.net();
+        if(navigator.onLine){ App.drain(); App.pull(false); }
+      }
+      else if(r==='wiped'){ toast('5 wrong PINs — device data erased.',1); App.show('vSetup'); }
+      else if(r==='nosalt'){ App.show('vSetup'); }
+      else { el('pinMsg').textContent='Wrong PIN — '+r+' tr'+(r===1?'y':'ies')+' left before wipe'; }
+    }
+  },
+
+  /* ----- route ----- */
+  async pull(manual){
+    if(!navigator.onLine){ if(manual) toast('Offline — showing the cached route.',1); App.net(); return; }
+    try{
+      const res = await App.api('pullRoute');
+      if(!res.ok){
+        if(/session/i.test(res.error||'')){ el('liUser').value=App.S.cfg.user; App.show('vLogin'); return; }
+        if(manual) toast(res.error||'Could not refresh.',1); return;
+      }
+      App.S.route = res.data; App.S.asOf = new Date().toISOString();
+      await Vault.persist();
+      App.homeUi(); App.renderRoute();
+      if(manual) toast('Route refreshed.');
+    }catch(e){ if(manual) toast('No signal — cached route stays available.',1); }
+  },
+
+  cards(){ return (App.S && App.S.route && (App.S.route.cards||App.S.route.Cards)) || []; },
+  qLoans(){ const m={}; (App.S.outbox||[]).forEach(i=>{ if(i.type==='PAYMENT') m[i.payload.LoanID]=1; }); return m; },
+
+  renderRoute(){
+    const box=el('routeList'); const q=(v('q')||'').toLowerCase(); const QD=App.qLoans();
+    let cards=App.cards();
+    if(q) cards=cards.filter(c=>JSON.stringify([c.Name,c.LoanID,c.BorrowerID,c.Area,c.RouteNo]).toLowerCase().includes(q));
+    if(!cards.length){ box.innerHTML='<div class="card center mut">'+(App.cards().length?'No matches.':'No route cached yet — tap ↻ while online.')+'</div>'; return; }
+    box.innerHTML=cards.map((c,i)=>{
+      const idx=App.cards().indexOf(c);
+      const exp=c.Expected!=null?c.Expected:(c.DueToday!=null?c.DueToday:c.Amount);
+      const queued=QD[c.LoanID];
+      return '<div class="card">'+
+        '<div class="row"><h3 style="flex:1">'+(c.Name||c.BorrowerName||'—')+'</h3>'+
+          (queued?'<span class="badge b-q">⏳ QUEUED</span>':
+           c.Status==='Collected'?'<span class="badge b-c">COLLECTED</span>':
+           (c.Overdue||c.OverdueOpen>0)?'<span class="badge b-o">OVERDUE</span>':'')+'</div>'+
+        '<p class="mut">'+(c.LoanID||'')+(c.Area?' · '+c.Area:'')+(c.RouteNo?' · Rt '+c.RouteNo:'')+
+          (c.Stars?' · '+'★'.repeat(Math.min(c.Stars,5)):'')+'</p>'+
+        '<div class="row" style="margin-top:8px;font-size:13px">'+
+          (exp!=null?'<div>Expected<br><b class="num">₱'+Number(exp).toLocaleString('en-PH',{minimumFractionDigits:2})+'</b></div>':'')+
+          (c.Balance!=null?'<div>Balance<br><b class="num">₱'+Number(c.Balance).toLocaleString('en-PH',{minimumFractionDigits:2})+'</b></div>':'')+
+        '</div>'+
+        '<div class="row" style="margin-top:10px">'+
+          (queued?'<span class="mut" style="flex:1;text-align:center">will sync automatically</span>'
+            :'<button class="btn btn--gold btn--sm" style="flex:1" onclick="App.openCollect('+idx+')">Collect</button>'+
+             '<button class="btn btn--ghost btn--sm" onclick="App.openVisit('+idx+')">Visit</button>')+
+        '</div></div>';
+    }).join('');
+  },
+
+  homeUi(){
+    const b=el('homeBanner');
+    const asOf=App.S.asOf?new Date(App.S.asOf).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}):null;
+    const st=App.dutyState();
+    b.innerHTML = (st.ok?'':'<div class="banner" style="background:var(--red-bg);color:var(--red);font-weight:600">⛔ '+st.why+'</div>')+
+      (navigator.onLine
+      ? (asOf?'<div class="banner banner--info">Route as of <b>'+asOf+'</b> · '+App.S.cfg.userName+'</div>':'')
+      : '<div class="banner banner--off">⚠ OFFLINE — route as of <b>'+(asOf||'—')+'</b>. Everything you record queues and syncs by itself.</div>');
+    el('hSub').textContent=App.S.cfg.deviceId||'ERMANO Lending';
+    var m=App.S.cfg.menu||[];
+    el('btnBrw').classList.toggle('hidden', m.length && m.indexOf('Borrowers')===-1);
+    el('btnApp').classList.toggle('hidden', m.length && m.indexOf('Loans')===-1 && m.indexOf('Applications')===-1);
+    App.chip();
+  },
+
+  /* ----- duty hours & clock integrity ----- */
+  nowC(){ return Date.now()+(App.S.skew||0); },   // server-corrected epoch
+  manilaHM(ep){ try{
+    const p=new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ep));
+    return p.replace(/^24/,'00');
+  }catch(e){ const d=new Date(ep); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); } },
+  dutyState(){
+    const S=App.S;
+    /* rolled-back device clock: refuse until the server re-anchors it */
+    if(S.lastDev && Date.now() < S.lastDev-120000)
+      return { ok:false, why:'Device clock moved BACKWARDS — reconnect to the server to continue collecting.' };
+    if(S.clockBad)
+      return { ok:false, why:'Device clock differs from server time by more than allowed — fix the phone\u2019s clock and sync.' };
+    const d=S.duty||{start:'07:30',end:'18:00',afterHoursOK:false,maxOfflineHours:48};
+    if(S.lastSrv){
+      const offH=(App.nowC()-S.lastSrv)/3600000;
+      if(offH > (d.maxOfflineHours||48))
+        return { ok:false, why:'This device has been offline more than '+(d.maxOfflineHours||48)+'h — reconnect once to continue collecting.' };
+    }
+    if(d.afterHoursOK) return { ok:true };
+    const hm=App.manilaHM(App.nowC());
+    if(hm < d.start || hm > d.end)
+      return { ok:false, ah:true, why:'You are currently outside your authorized duty hours ('+d.start+'\u2013'+d.end+'). Viewing and syncing stay available.' };
+    return { ok:true };
+  },
+  guard(){
+    const st=App.dutyState();
+    if(st.ok) return true;
+    if(st.ah){ App.S.ahAttempts=(App.S.ahAttempts||0)+1; Vault.persist(); }
+    toast('\u26D4 '+st.why, 1);
+    App.homeUi();
+    return false;
+  },
+
+  /* ----- collect + provisional receipt ----- */
+  openCollect(i){ if(!App.guard()) return;
+    App.current=App.cards()[i]; if(!App.current) return;
+    el('cName').textContent=App.current.Name||'—';
+    el('cMeta').textContent=(App.current.LoanID||'')+(App.current.Balance!=null?' · balance ₱'+App.current.Balance:'');
+    el('cAmt').value=''; el('cRef').value='';
+    Sig.clear();
+    App.open('mCollect'); },
+  async collect(){
+    if(!App.guard()) return;
+    const amt=Number(v('cAmt')); if(!(amt>0)) return toast('Enter the amount.',1);
+    const c=App.current;
+    App.S.seq++;
+    const ref=App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now();
+    const prv=PROVISIONAL_RECEIPTS?('PRV-'+App.S.cfg.deviceId+'-'+String(App.S.seq).padStart(4,'0')):'';
+    const gps=await App.gps();
+    App.S.outbox.push({ clientRef:ref, seq:App.S.seq, type:'PAYMENT', capturedAt:new Date().toISOString(),
+      label:'Payment ₱'+amt+' — '+(c.Name||c.LoanID),
+      payload:{ LoanID:c.LoanID, AmountPaid:amt, PaymentMethod:v('cMethod'),
+        ReferenceNo:(v('cRef')||'')+(prv?' ['+prv+']':''), Lat:gps.lat, Lng:gps.lng, Accuracy:gps.acc, GeoReason:'PWA' } });
+    if(Sig.dirty){
+      try{ App.S.outbox[App.S.outbox.length-1].signature =
+        el('sigPad').toDataURL('image/png').split(',')[1]; }catch(e){}
+    }
+    App.S.receipts.unshift({ prv, or:'', amt, name:c.Name||c.LoanID, loan:c.LoanID,
+      at:new Date().toISOString(), ref });
+    await Vault.persist();
+    App.close('mCollect');
+    el('rAmt').textContent='₱'+amt.toLocaleString('en-PH',{minimumFractionDigits:2});
+    el('rName').textContent=c.Name||c.LoanID;
+    el('rMeta').textContent=c.LoanID+' · '+new Date().toLocaleString('en-PH',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    el('rNo').textContent=prv||'(receipt at sync)';
+    el('rWho').textContent=App.S.cfg.userName;
+    App.open('mRcpt');
+    App.chip(); App.renderRoute(); App.drain();
+  },
+
+  /* ----- visit / PTP ----- */
+  openVisit(i){ if(!App.guard()) return;
+    App.current=App.cards()[i]; if(!App.current) return;
+    el('vName').textContent=App.current.Name||'—';
+    App.visitMode('out');
+    el('pDate').value=new Date(Date.now()+86400000).toISOString().slice(0,10);
+    App.open('mVisit'); },
+  visitMode(m){ el('segOut').className=m==='out'?'on':''; el('segPtp').className=m==='ptp'?'on':'';
+    el('visitOut').classList.toggle('hidden',m!=='out'); el('visitPtp').classList.toggle('hidden',m!=='ptp');
+    App.vm=m; },
+  async visitSave(){
+    if(!App.guard()) return;
+    const c=App.current, gps=await App.gps();
+    App.S.seq++;
+    const ref=App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now();
+    if(App.vm==='out'){
+      App.S.outbox.push({ clientRef:ref, seq:App.S.seq, type:'VISIT_OUTCOME',
+        capturedAt:new Date().toISOString(), label:v('oType')+' — '+(c.Name||c.LoanID),
+        payload:{ LoanID:c.LoanID, OutcomeType:v('oType'), Note:v('oNote'), Lat:gps.lat, Lng:gps.lng } });
+    } else {
+      const amt=Number(v('pAmt')); if(!(amt>0)) return toast('Amount promised?',1);
+      App.S.outbox.push({ clientRef:ref, seq:App.S.seq, type:'PTP',
+        capturedAt:new Date().toISOString(), label:'Promise ₱'+amt+' — '+(c.Name||c.LoanID),
+        payload:{ LoanID:c.LoanID, ActivityType:'Visit', Outcome:'PTP',
+          PromiseToPayDate:v('pDate'), AmountPromised:amt,
+          Remarks:(v('pNote')||'')+' [PWA gps:'+gps.lat+','+gps.lng+']' } });
+    }
+    await Vault.persist(); App.close('mVisit'); toast('Recorded — will sync.'); App.chip(); App.drain();
+  },
+
+  /* ----- expense ----- */
+  openExpense(){ if(!App.guard()) return; el('eAmt').value=''; el('eNote').value=''; App.open('mExp'); },
+  async expense(){
+    if(!App.guard()) return;
+    const amt=Number(v('eAmt')); if(!(amt>0)) return toast('Enter the amount.',1);
+    App.S.seq++;
+    App.S.outbox.push({ clientRef:App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now(), seq:App.S.seq,
+      type:'EXPENSE', capturedAt:new Date().toISOString(), label:v('eCat')+' ₱'+amt,
+      payload:{ Category:v('eCat'), Amount:amt, Notes:v('eNote') } });
+    await Vault.persist(); App.close('mExp'); toast('Expense queued.'); App.chip(); App.drain();
+  },
+
+  /* ----- new borrower (BORROWER_NEW) ----- */
+  openBorrower(){ ['bFirst','bLast','bMobile','bAddr','bArea'].forEach(i=>el(i).value='');
+    el('bPhoto').value=''; App.open('mBrw'); },
+  async borrowerSave(){
+    if(!App.guard()) return;
+    const f=v('bFirst'), l=v('bLast');
+    if(!f||!l) return toast('First and last name are required.',1);
+    App.S.seq++;
+    const ref=App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now();
+    const evt={ clientRef:ref, seq:App.S.seq, type:'BORROWER_NEW',
+      capturedAt:new Date().toISOString(), label:'Borrower '+f+' '+l,
+      payload:{ FirstName:f, LastName:l, MobileNumber:v('bMobile'),
+        Address:v('bAddr'), Area:v('bArea') } };
+    const file=el('bPhoto').files[0];
+    if(file){
+      try{ evt.photo=await App.shrink(file, 640, .72); }
+      catch(e){ toast('Photo could not be read — registering without it.',1); }
+    }
+    App.S.outbox.push(evt);
+    App.S.people.unshift({ ref, name:f+' '+l });
+    await Vault.persist();
+    App.close('mBrw'); toast('Borrower queued — BOR number arrives at sync.');
+    App.chip(); App.drain();
+  },
+  shrink(file, max, q){ return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{ const sc=Math.min(1, max/Math.max(img.width,img.height));
+      const cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      res(cv.toDataURL('image/jpeg', q).split(',')[1]); };
+    img.onerror=rej;
+    img.src=URL.createObjectURL(file);
+  }); },
+
+  /* ----- loan application draft (APP_DRAFT_SUBMIT) ----- */
+  openApp(){
+    const seen={}, opts=[];
+    (App.S.people||[]).forEach(x=>opts.push('<option value="ref:'+x.ref+'">'+x.name+' (new, this phone)</option>'));
+    App.cards().forEach(c=>{ if(c.BorrowerID && !seen[c.BorrowerID]){ seen[c.BorrowerID]=1;
+      opts.push('<option value="id:'+c.BorrowerID+'">'+(c.Name||c.BorrowerID)+'</option>'); }});
+    opts.push('<option value="manual">Other — type Borrower ID…</option>');
+    el('aWho').innerHTML=opts.join('');
+    el('aWho').onchange=()=>el('aManualWrap').classList.toggle('hidden', el('aWho').value!=='manual');
+    el('aManualWrap').classList.add('hidden');
+    const prods=(App.S.route&&App.S.route.products)||[];
+    el('aProd').innerHTML=prods.length
+      ? prods.map(p=>'<option value="'+p.ProductID+'">'+p.ProductName+' ('+p.PaymentFrequency+')</option>').join('')
+      : '<option value="">— refresh route online to load products —</option>';
+    el('aAmt').value=''; el('aTerm').value=''; el('aPurp').value='';
+    App.open('mApp');
+  },
+  async appSave(){
+    if(!App.guard()) return;
+    const who=el('aWho').value, amt=Number(v('aAmt'));
+    if(!el('aProd').value) return toast('Products not loaded — refresh the route online once.',1);
+    if(!(amt>0)) return toast('Enter the amount.',1);
+    const payload={ ProductID:el('aProd').value, AppliedAmount:amt,
+      TermCount:Number(v('aTerm'))||0, Purpose:v('aPurp') };
+    if(who==='manual'){ const id=v('aManual').toUpperCase();
+      if(!id) return toast('Type the Borrower ID.',1); payload.BorrowerID=id; }
+    else if(who.slice(0,4)==='ref:') payload.BorrowerRef=who.slice(4);
+    else payload.BorrowerID=who.slice(3);
+    App.S.seq++;
+    App.S.outbox.push({ clientRef:App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now(), seq:App.S.seq,
+      type:'APP_DRAFT_SUBMIT', capturedAt:new Date().toISOString(),
+      label:'Application ₱'+amt, payload });
+    await Vault.persist();
+    App.close('mApp'); toast('Application queued as a Draft for the office.');
+    App.chip(); App.drain();
+  },
+
+  /* ----- sync engine ----- */
+  pend(){ return (App.S&&App.S.outbox||[]).filter(i=>!i.err); },
+  errs(){ return (App.S&&App.S.outbox||[]).filter(i=>i.err); },
+  async drain(){
+    if(App.busy||!App.S||!navigator.onLine) return;
+    const batch=App.pend().slice(0,40);
+    if(!batch.length){ App.chip(); return; }
+    App.busy=true;
+    try{
+      const res=await App.api('pushEvents',{events:batch});
+      App.busy=false; App.backoff=0;
+      if(!res.ok){
+        if(/session/i.test(res.error||'')){ el('liUser').value=App.S.cfg.user; App.show('vLogin'); return; }
+        toast(res.error||'Sync failed.',1); return;
+      }
+      let ors=0;
+      res.data.results.forEach(r=>{
+        const item=App.S.outbox.find(i=>i.clientRef===r.clientRef); if(!item) return;
+        if(r.status==='OK'||r.status==='DUPLICATE'){
+          App.S.outbox=App.S.outbox.filter(i=>i!==item);
+          if(item.type==='PAYMENT'&&r.officialOR){
+            const rc=App.S.receipts.find(x=>x.ref===r.clientRef);
+            if(rc) rc.or=r.officialOR; ors++;
+          }
+        } else { item.err=r.message||r.status; }
+      });
+      await Vault.persist();
+      App.chip(); App.renderRoute();
+      if(ors) toast(ors+' payment'+(ors>1?'s':'')+' synced — official OR assigned.');
+      if(App.pend().length) App.drain(); else App.pull(false);
+    }catch(e){
+      App.busy=false;
+      App.backoff=Math.min((App.backoff||5)*4,900);
+      clearTimeout(App.timer); App.timer=setTimeout(()=>App.drain(), App.backoff*1000);
+    }
+  },
+  chip(){
+    const c=el('chipSync'); if(!App.S){ c.classList.add('hidden'); return; }
+    const p=App.pend().length, e=App.errs().length;
+    if(!p&&!e){ c.classList.add('hidden'); return; }
+    c.classList.remove('hidden');
+    c.className='chip '+(e?'chip--err':'chip--sync');
+    c.textContent=e?('⚠ '+e+(p?' · ⏳'+p:'')):('⏳ '+p);
+  },
+  chipTap(){
+    const e=App.errs();
+    if(e.length){
+      const it=e[0];
+      if(confirm('"'+it.label+'" was REJECTED:\n\n'+it.err+'\n\nOK = discard (the action did NOT happen — handle it manually)\nCancel = retry')){
+        App.S.outbox=App.S.outbox.filter(i=>i!==it);
+      } else delete it.err;
+      Vault.persist().then(()=>{ App.chip(); App.drain(); });
+      return;
+    }
+    App.drain(); toast('Syncing…');
+  },
+
+  /* ----- receipts & about ----- */
+  renderReceipts(){
+    el('rcptList').innerHTML=(App.S.receipts||[]).length?App.S.receipts.map(r=>
+      '<div class="card"><div class="row"><b style="flex:1">₱'+Number(r.amt).toLocaleString('en-PH',{minimumFractionDigits:2})+'</b>'+
+      (r.or?'<span class="badge b-c">'+r.or+'</span>':'<span class="badge b-q">'+(r.prv||'pending')+'</span>')+'</div>'+
+      '<p class="mut">'+r.name+' · '+r.loan+' · '+new Date(r.at).toLocaleString('en-PH',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+
+      (r.or&&r.prv?'<br>'+r.prv+' → '+r.or:'')+'</p></div>').join('')
+      :'<div class="card center mut">No receipts yet.</div>';
+  },
+  renderAbout(){
+    el('aboutBox').innerHTML='<h3>Device status</h3><p class="mut" style="margin-top:8px">'+
+      'Device: <b>'+App.S.cfg.deviceId+'</b><br>User: <b>'+App.S.cfg.userName+'</b><br>'+
+      'Server: <span style="word-break:break-all">'+App.S.cfg.url+'</span><br>'+
+      'Pending sync: <b>'+App.pend().length+'</b> · needs attention: <b>'+App.errs().length+'</b><br>'+
+      'Route as of: <b>'+(App.S.asOf?new Date(App.S.asOf).toLocaleString('en-PH'):'never')+'</b></p>'+
+      '<p class="mut" style="margin-top:8px">Duty hours: <b>'+((App.S.duty&&(App.S.duty.start+'\u2013'+App.S.duty.end))||'default')+'</b>'+
+      ((App.S.duty&&App.S.duty.afterHoursOK)?' · <b style="color:var(--amber)">after-hours override ON</b>':'')+
+      ' · clock skew: <b>'+Math.round((App.S.skew||0)/1000)+'s</b></p>'+
+      '<p class="mut" style="margin-top:8px">Provisional receipts: <b>'+(PROVISIONAL_RECEIPTS?'ON':'OFF')+'</b> (pending ERMANO/BIR ruling)</p>';
+  },
+
+  async selfWipe(){
+    if(App.pend().length)
+      return toast('⛔ '+App.pend().length+' unsynced item(s) on this device. Sync first — erasing is only allowed on a clean device. If it is broken or lost, ask Admin to remote-wipe.',1);
+    if(App.errs().length)
+      return toast('⛔ Resolve the red needs-attention item(s) with your manager first.',1);
+    if(!confirm('Erase all ELMS data on this phone? Everything is synced — nothing will be lost.')) return;
+    await App.nuke(); location.reload();
+  },
+  async nuke(){ App.S=null; Vault.key=null;
+    await IDB.del('vault'); await IDB.del('salt'); await IDB.del('tries'); },
+
+  /* ----- utils ----- */
+  gps(){ return new Promise(res=>{
+    if(!navigator.geolocation) return res({lat:'',lng:'',acc:''});
+    navigator.geolocation.getCurrentPosition(
+      p=>res({lat:p.coords.latitude,lng:p.coords.longitude,acc:Math.round(p.coords.accuracy)}),
+      ()=>res({lat:'',lng:'',acc:''}), {timeout:6000,maximumAge:120000});
+  }); },
+  net(){ const c=el('chipNet'); c.classList.remove('hidden');
+    c.textContent=navigator.onLine?'● online':'○ offline';
+    c.style.color=navigator.onLine?'#7FE0A7':'#FFD9A0';
+    if(App.S) App.homeUi(); },
+  show(id){ ['vSetup','vPending','vPin','vLogin','vHome','vReceipts','vAbout']
+    .forEach(x=>el(x).classList.toggle('hidden',x!==id)); },
+  open(id){ el(id).classList.add('show'); },
+  close(id){ el(id).classList.remove('show'); }
+};
+
+function el(id){ return document.getElementById(id); }
+function v(id){ return (el(id).value||'').trim(); }
+function bz(id,on){ el(id).disabled=!!on; }
+let TT=null;
+function toast(msg, err){
+  const t=el('toast'); t.textContent=msg; t.className='toast'+(err?' err':''); t.style.display='block';
+  clearTimeout(TT); TT=setTimeout(()=>t.style.display='none', 3800);
+}
+
+/* signature pad */
+const Sig={ dirty:false, ctx:null,
+  init(){ const cv=el('sigPad'); if(!cv) return;
+    Sig.ctx=cv.getContext('2d'); Sig.ctx.lineWidth=3; Sig.ctx.lineCap='round'; Sig.ctx.strokeStyle='#1C2B3A';
+    let draw=false;
+    const pos=e=>{ const r=cv.getBoundingClientRect();
+      return { x:(e.clientX-r.left)*cv.width/r.width, y:(e.clientY-r.top)*cv.height/r.height }; };
+    cv.addEventListener('pointerdown',e=>{ draw=true; const p=pos(e);
+      Sig.ctx.beginPath(); Sig.ctx.moveTo(p.x,p.y); e.preventDefault(); });
+    cv.addEventListener('pointermove',e=>{ if(!draw) return; const p=pos(e);
+      Sig.ctx.lineTo(p.x,p.y); Sig.ctx.stroke(); Sig.dirty=true; e.preventDefault(); });
+    ['pointerup','pointerleave'].forEach(x=>cv.addEventListener(x,()=>draw=false));
+  },
+  clear(){ if(Sig.ctx){ Sig.ctx.clearRect(0,0,600,200); } Sig.dirty=false; }
+};
+Sig.init();
+App.boot();
+</script>
+</body>
+</html>
