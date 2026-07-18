@@ -1,7 +1,7 @@
 /* ELMS Field — service worker: cache the app shell so the app opens with no
    signal. API calls (script.google.com) are never intercepted — the app's own
    outbox handles offline writes, and stale API responses must never be served. */
-const SHELL = 'elms-field-v4';
+const SHELL = 'elms-field-v6';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
