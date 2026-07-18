@@ -144,6 +144,7 @@ label{font-size:12px;font-weight:600;color:var(--slate);display:block;margin:12p
       <button class="btn btn--ghost" onclick="App.openExpense()">+ Expense</button>
       <button class="btn btn--ghost hidden" id="btnBrw" onclick="App.openBorrower()">+ Borrower</button>
       <button class="btn btn--ghost hidden" id="btnApp" onclick="App.openApp()">+ Loan appl.</button>
+      <button class="btn btn--ghost hidden" id="btnCr" onclick="App.openCredit()">✓ Credit check</button>
     </div>
     <div class="row" style="margin-top:8px">
       <button class="btn btn--ghost" onclick="App.show('vReceipts');App.renderReceipts()">Receipts</button>
@@ -170,7 +171,8 @@ label{font-size:12px;font-weight:600;color:var(--slate);display:block;margin:12p
 <div class="scrim" id="mCollect"><div class="sheet">
   <div class="grabber"></div>
   <h2 id="cName">—</h2><p class="mut" id="cMeta">—</p>
-  <label>Amount received (₱)</label><input id="cAmt" type="number" inputmode="decimal" step="0.01">
+  <label>Installment received (₱)</label><input id="cAmt" type="number" inputmode="decimal" step="0.01">
+  <label>Penalty received (₱, optional — never deducted from the installment)</label><input id="cPen" type="number" inputmode="decimal" step="0.01" placeholder="0">
   <label>Method</label><select id="cMethod"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank</option></select>
   <label>Reference / note</label><input id="cRef">
   <label>Borrower signature (optional)</label>
@@ -269,6 +271,38 @@ label{font-size:12px;font-weight:600;color:var(--slate);display:block;margin:12p
     <button class="btn btn--ghost" onclick="App.close('mApp')">Cancel</button>
     <button class="btn btn--go" onclick="App.appSave()">Queue application</button>
   </div>
+</div></div>
+
+<!-- CREDIT CHECK SHEET (offline standard review) -->
+<div class="scrim" id="mCr"><div class="sheet">
+  <div class="grabber"></div>
+  <h2>Credit check <span class="badge b-q" style="vertical-align:3px">STANDARD · offline</span></h2>
+  <p class="mut">Rules-based pre-screen. The memo shows instantly; the summary syncs to the office. AI document review is online + admin-only — use the web app.</p>
+  <label>Applicant name *</label><input id="crfName">
+  <label>Loan amount (₱) *</label><input id="crfAmt" type="number" inputmode="decimal">
+  <div class="row">
+    <div style="flex:1"><label>Term (months)</label><input id="crfTerm" type="number" value="12" inputmode="numeric"></div>
+    <div style="flex:1"><label>Rate %/mo</label><input id="crfRate" type="number" value="3" step="0.1" inputmode="decimal"></div>
+  </div>
+  <div class="row">
+    <div style="flex:1"><label>Monthly income (₱)</label><input id="crfInc" type="number" inputmode="decimal"></div>
+    <div style="flex:1"><label>Other income (₱)</label><input id="crfInc2" type="number" inputmode="decimal"></div>
+  </div>
+  <div class="row">
+    <div style="flex:1"><label>Existing payments (₱/mo)</label><input id="crfDebt" type="number" inputmode="decimal"></div>
+    <div style="flex:1"><label>Household size</label><input id="crfHouse" type="number" value="1" inputmode="numeric"></div>
+  </div>
+  <div class="row">
+    <div style="flex:1"><label>Tenure (years)</label><input id="crfTen" type="number" step="0.5" inputmode="decimal"></div>
+    <div style="flex:1"><label>Prior history</label><input id="crfHist" placeholder="fully paid / past due…"></div>
+  </div>
+  <label>Documents physically sighted (tick each)</label>
+  <div id="crfDocs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px"></div>
+  <div class="row" style="margin-top:16px">
+    <button class="btn btn--ghost" onclick="App.close('mCr')">Cancel</button>
+    <button class="btn btn--go" onclick="App.creditRun()">Run check</button>
+  </div>
+  <div id="crfOut" style="margin-top:16px"></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -518,6 +552,7 @@ const App = {
     var m=App.S.cfg.menu||[];
     el('btnBrw').classList.toggle('hidden', m.length && m.indexOf('Borrowers')===-1);
     el('btnApp').classList.toggle('hidden', m.length && m.indexOf('Loans')===-1 && m.indexOf('Applications')===-1);
+    el('btnCr').classList.toggle('hidden', m.length && m.indexOf('CreditReview')===-1);
     App.chip();
   },
 
@@ -560,26 +595,28 @@ const App = {
     App.current=App.cards()[i]; if(!App.current) return;
     el('cName').textContent=App.current.Name||'—';
     el('cMeta').textContent=(App.current.LoanID||'')+(App.current.Balance!=null?' · balance ₱'+App.current.Balance:'');
-    el('cAmt').value=''; el('cRef').value='';
+    el('cAmt').value=''; el('cRef').value=''; if(el('cPen')) el('cPen').value='';
     Sig.clear();
     App.open('mCollect'); },
   async collect(){
     if(!App.guard()) return;
-    const amt=Number(v('cAmt')); if(!(amt>0)) return toast('Enter the amount.',1);
+    const amt=Number(v('cAmt'))||0;
+    const pen=Number(v('cPen'))||0;
+    if(!(amt>0) && !(pen>0)) return toast('Enter an installment and/or penalty amount.',1);
     const c=App.current;
     App.S.seq++;
     const ref=App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now();
     const prv=PROVISIONAL_RECEIPTS?('PRV-'+App.S.cfg.deviceId+'-'+String(App.S.seq).padStart(4,'0')):'';
     const gps=await App.gps();
     App.S.outbox.push({ clientRef:ref, seq:App.S.seq, type:'PAYMENT', capturedAt:new Date().toISOString(),
-      label:'Payment ₱'+amt+' — '+(c.Name||c.LoanID),
-      payload:{ LoanID:c.LoanID, AmountPaid:amt, PaymentMethod:v('cMethod'),
+      label:'Payment ₱'+amt+(pen>0?' +pen ₱'+pen:'')+' — '+(c.Name||c.LoanID),
+      payload:{ LoanID:c.LoanID, AmountPaid:amt, PenaltyAmount:pen, PaymentMethod:v('cMethod'),
         ReferenceNo:(v('cRef')||'')+(prv?' ['+prv+']':''), Lat:gps.lat, Lng:gps.lng, Accuracy:gps.acc, GeoReason:'PWA' } });
     if(Sig.dirty){
       try{ App.S.outbox[App.S.outbox.length-1].signature =
         el('sigPad').toDataURL('image/png').split(',')[1]; }catch(e){}
     }
-    App.S.receipts.unshift({ prv, or:'', amt, name:c.Name||c.LoanID, loan:c.LoanID,
+    App.S.receipts.unshift({ prv, or:'', amt:amt+pen, name:c.Name||c.LoanID, loan:c.LoanID,
       at:new Date().toISOString(), ref });
     await Vault.persist();
     App.close('mCollect');
@@ -703,6 +740,88 @@ const App = {
       label:'Application ₱'+amt, payload });
     await Vault.persist();
     App.close('mApp'); toast('Application queued as a Draft for the office.');
+    App.chip(); App.drain();
+  },
+
+  /* ----- offline standard credit check ----- */
+  CR_DOCS:['Gov\u2019t ID #1','Gov\u2019t ID #2','Proof of Billing','Signed Application','Proof of Income','Bank Statement'],
+  openCredit(){ if(!App.guard()) return;
+    ['crfName','crfAmt','crfInc','crfInc2','crfDebt','crfTen','crfHist'].forEach(i=>el(i).value='');
+    el('crfTerm').value='12'; el('crfRate').value='3'; el('crfHouse').value='1';
+    el('crfDocs').innerHTML=App.CR_DOCS.map((d,i)=>
+      '<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="crfD'+i+'" style="width:auto">'+d+'</label>').join('');
+    el('crfOut').innerHTML='';
+    App.open('mCr'); },
+  creditEngine(a){
+    const P=a.amt,nM=a.term||1,r=a.rate/100,inc=a.inc+a.inc2;
+    const amort=(P>0&&nM>0)?(P+P*r*nM)/nM:0;
+    const dti=inc>0?(a.debt+amort)/inc:NaN;
+    const ndi=inc-a.debt-amort;
+    const flags=[];
+    let cap;
+    if(!isFinite(dti)){ cap=1; flags.push(['critical','No income declared — capacity cannot be established.']); }
+    else if(dti<=0.25) cap=5; else if(dti<=0.35) cap=4; else if(dti<=0.45) cap=3;
+    else if(dti<=0.50){ cap=2; flags.push(['major','DTI '+(dti*100).toFixed(1)+'% in the marginal band (35–50%).']); }
+    else { cap=1; flags.push(['critical','DTI '+(dti*100).toFixed(1)+'% exceeds the 50% decline threshold.']); }
+    const minNdi=(a.house||1)*2500;
+    if(ndi<0){ cap=1; flags.push(['critical','Negative net disposable income after amortization.']); }
+    else if(inc>0&&ndi<minNdi){ cap=Math.max(1,cap-1);
+      flags.push(['major','NDI ₱'+Math.round(ndi).toLocaleString()+' below the ₱'+minNdi.toLocaleString()+' household floor.']); }
+    let ch=3;
+    if(a.ten>=3) ch++; else if(a.ten<1){ ch--; flags.push(['minor','Tenure under 1 year.']); }
+    if(/past due|late|bounce|default|restructur/i.test(a.hist)){ ch--;
+      flags.push(['major','Declared history mentions delinquency — pull the ledger before deciding.']); }
+    else if(/fully paid|good standing|completed/i.test(a.hist)) ch++;
+    ch=Math.min(5,Math.max(1,ch));
+    const have=a.docs.filter(Boolean).length;
+    const doc=Math.min(5,Math.max(1,Math.round(have/App.CR_DOCS.length*50)/10));
+    if(have<App.CR_DOCS.length)
+      flags.push(['major',(App.CR_DOCS.length-have)+' required document(s) not sighted.']);
+    let cd=3;
+    if(inc>0&&P>inc*10){ cd=2; flags.push(['major','Loan is over 10× monthly income.']); }
+    if(inc>0&&P>inc*3&&have<App.CR_DOCS.length)
+      flags.push(['minor','Large unsecured request with incomplete documents.']);
+    flags.push(['minor','Field standard check: documents sighted, not machine-verified.']);
+    const score=Math.round((cap*.35+ch*.25+doc*.20+2*.15+cd*.05)*100)/100;
+    const critical=flags.some(f=>f[0]==='critical'), major=flags.some(f=>f[0]==='major');
+    const rec=(critical||score<2.5)?'DECLINE':(score>=4&&!major)?'APPROVE':(score>=3)?'APPROVE_WITH_CONDITIONS':'REFER';
+    return { recommendation:rec, score:score,
+      scores:{capacity:cap,character:ch,documents:doc,collateral:2,conditions:cd},
+      capacity:{dti:isFinite(dti)?+dti.toFixed(3):null,netDisposableIncome:Math.round(ndi),proposedAmortization:Math.round(amort)},
+      flags:flags.map(f=>({severity:f[0],finding:f[1]})),
+      summary:'Field pre-screen: ₱'+Math.round(P).toLocaleString()+' over '+nM+' mos. DTI '+
+        (isFinite(dti)?(dti*100).toFixed(1)+'%':'n/a')+', NDI ₱'+Math.round(ndi).toLocaleString()+
+        ', '+have+'/'+App.CR_DOCS.length+' docs sighted. Score '+score.toFixed(2)+' → '+rec.replace(/_/g,' ')+'.' };
+  },
+  async creditRun(){
+    if(!App.guard()) return;
+    const a={ name:v('crfName'), amt:Number(v('crfAmt')), term:Number(v('crfTerm'))||12,
+      rate:Number(v('crfRate'))||0, inc:Number(v('crfInc'))||0, inc2:Number(v('crfInc2'))||0,
+      debt:Number(v('crfDebt'))||0, house:Number(v('crfHouse'))||1, ten:Number(v('crfTen'))||0,
+      hist:v('crfHist'), docs:App.CR_DOCS.map((d,i)=>el('crfD'+i).checked) };
+    if(!a.name||!(a.amt>0)) return toast('Name and amount are required.',1);
+    const R=App.creditEngine(a);
+    const COL={APPROVE:'var(--green)',APPROVE_WITH_CONDITIONS:'var(--amber)',REFER:'var(--royal)',DECLINE:'var(--red)'};
+    el('crfOut').innerHTML='<div class="rcpt" style="border-color:'+COL[R.recommendation]+'">'+
+      '<div class="watermark" style="color:'+COL[R.recommendation]+'">'+R.recommendation.replace(/_/g,' ')+'</div>'+
+      '<div class="amt" style="font-size:26px;color:'+COL[R.recommendation]+'">'+R.score.toFixed(2)+' / 5</div>'+
+      '<div class="mut" style="text-align:left;margin-top:10px">'+
+      'DTI: <b>'+(R.capacity.dti!=null?(R.capacity.dti*100).toFixed(1)+'%':'—')+'</b> · NDI: <b>₱'+
+      R.capacity.netDisposableIncome.toLocaleString()+'</b> · Amort: <b>₱'+R.capacity.proposedAmortization.toLocaleString()+'</b><br><br>'+
+      R.flags.map(f=>'• <b>'+f.severity.toUpperCase()+'</b> '+f.finding).join('<br>')+'</div></div>';
+    App.S.seq++;
+    App.S.outbox.push({ clientRef:App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now(), seq:App.S.seq,
+      type:'CREDIT_REVIEW', capturedAt:new Date().toISOString(),
+      label:'Credit check — '+a.name+' ('+R.recommendation.replace(/_/g,' ')+')',
+      payload:{ app:{ refNo:'FCR-'+App.S.cfg.deviceId+'-'+App.S.seq, fullName:a.name,
+        branch:(App.S.cfg.user||''), loanAmount:a.amt, termMonths:a.term,
+        monthlyIncome:a.inc, otherIncome:a.inc2, existingObligations:a.debt,
+        householdSize:a.house, tenureYears:a.ten, priorHistory:a.hist, monthlyRate:a.rate },
+        result:{ mode:'STANDARD', recommendation:R.recommendation, score:R.score,
+          capacity:R.capacity, flags:R.flags, summary:R.summary },
+        docsSighted:a.docs.filter(Boolean).length } });
+    await Vault.persist();
+    toast('Check done — result shown below, summary will sync to the office.');
     App.chip(); App.drain();
   },
 
