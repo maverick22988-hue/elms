@@ -510,6 +510,31 @@ const App = {
   },
 
   cards(){ return (App.S && App.S.route && (App.S.route.cards||App.S.route.Cards)) || []; },
+  dpList(){ return (App.S && App.S.route && App.S.route.providers) || []; },
+  dpMethods(){
+    const sel=el('cMethod'); if(!sel)return;
+    const cur=sel.value;
+    let opts='<option>Cash</option>';
+    App.dpList().forEach(pv=>{ opts+='<option value="'+pv.code+'">'+pv.name+'</option>'; });
+    sel.innerHTML=opts;
+    if([].some.call(sel.options,o=>o.value===cur)) sel.value=cur;
+    App.dpPanel();
+  },
+  dpPanel(){
+    const sel=el('cMethod'), pan=el('dpPanel'); if(!sel||!pan)return;
+    const pv=App.dpList().filter(x=>x.code===sel.value)[0];
+    const req=el('cRefReq'); if(req) req.style.display=pv?'inline':'none';
+    if(!pv){ pan.style.display='none'; return; }
+    el('dpName').textContent=pv.name;
+    const q=el('dpQR');
+    if(pv.qrUrl){ q.style.display='block'; q.src=pv.qrUrl; } else q.style.display='none';
+    el('dpAcct').textContent=pv.accountName||'';
+    el('dpNum').textContent=pv.number||'';
+    const amt=Number((el('cAmt')&&el('cAmt').value)||0)+Number((el('cPen')&&el('cPen').value)||0);
+    el('dpAmt').textContent=amt>0?('Amount to pay: \u20B1'+amt.toLocaleString('en-PH')):'';
+    el('dpIns').textContent=pv.instructions||'';
+    pan.style.display='block';
+  },
   qLoans(){ const m={}; (App.S.outbox||[]).forEach(i=>{ if(i.type==='PAYMENT') m[i.payload.LoanID]=1; }); return m; },
 
   renderRoute(){
@@ -596,6 +621,7 @@ const App = {
     el('cName').textContent=App.current.Name||'—';
     el('cMeta').textContent=(App.current.LoanID||'')+(App.current.Balance!=null?' · balance ₱'+App.current.Balance:'');
     el('cAmt').value=''; el('cRef').value=''; if(el('cPen')) el('cPen').value='';
+    App.dpMethods();
     Sig.clear();
     App.open('mCollect'); },
   async collect(){
@@ -603,6 +629,8 @@ const App = {
     const amt=Number(v('cAmt'))||0;
     const pen=Number(v('cPen'))||0;
     if(!(amt>0) && !(pen>0)) return toast('Enter an installment and/or penalty amount.',1);
+    if(v('cMethod')!=='Cash' && !v('cRef').trim())
+      return toast('Digital payments need the provider reference number.',1);
     const c=App.current;
     App.S.seq++;
     const ref=App.S.cfg.deviceId+'-'+App.S.seq+'-'+Date.now();
