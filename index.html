@@ -275,7 +275,8 @@ label{font-size:12px;font-weight:600;color:var(--slate);display:block;margin:12p
   <label>First name *</label><input id="bFirst">
   <label>Last name *</label><input id="bLast">
   <label>Mobile</label><input id="bMobile" inputmode="tel">
-  <label>Address</label><input id="bAddr">
+  <label>Addr1 · Home address</label><input id="bAddr">
+  <label>Addr2 · Business address (if any)</label><input id="bAddrB">
   <label>Area</label><input id="bArea" placeholder="e.g. Bulacao">
   <label>Photo (optional)</label>
   <input type="file" id="bPhoto" accept="image/*" capture="environment" style="padding:9px">
@@ -729,7 +730,7 @@ const App = {
   },
 
   /* ----- new borrower (BORROWER_NEW) ----- */
-  openBorrower(){ ['bFirst','bLast','bMobile','bAddr','bArea'].forEach(i=>el(i).value='');
+  openBorrower(){ ['bFirst','bLast','bMobile','bAddr','bAddrB','bArea'].forEach(i=>el(i).value='');
     el('bPhoto').value=''; App.open('mBrw'); },
   async borrowerSave(){
     if(!App.guard()) return;
@@ -740,7 +741,8 @@ const App = {
     const evt={ clientRef:ref, seq:App.S.seq, type:'BORROWER_NEW',
       capturedAt:new Date().toISOString(), label:'Borrower '+f+' '+l,
       payload:{ FirstName:f, LastName:l, MobileNumber:v('bMobile'),
-        Address:v('bAddr'), Area:v('bArea') } };
+        Address:v('bAddr'), HomeAddress:v('bAddr'),
+        BusinessAddress:v('bAddrB'), Area:v('bArea') } };
     const file=el('bPhoto').files[0];
     if(file){
       try{ evt.photo=await App.shrink(file, 640, .72); }
