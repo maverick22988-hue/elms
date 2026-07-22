@@ -186,8 +186,27 @@ label{font-size:12px;font-weight:600;color:var(--slate);display:block;margin:12p
   </div>
   <label>Reference / note <span id="cRefReq" style="color:#C0392B;display:none">(required for digital)</span></label><input id="cRef">
   <label>Borrower signature (optional)</label>
-  <canvas id="sigPad" width="600" height="200" style="width:100%;height:110px;border:1.5px dashed var(--line);border-radius:10px;background:#fff;touch-action:none"></canvas>
+  <div id="sigField" onclick="Sig.open()" style="border:1.5px dashed var(--line);border-radius:10px;background:#fff;min-height:74px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden">
+    <span id="sigHint" style="color:#8FA0B0;font-size:13px">✍ Tap to sign (opens full screen)</span>
+    <img id="sigThumb" style="display:none;max-height:70px;max-width:100%" alt="">
+  </div>
   <button class="btn btn--ghost btn--sm" style="margin-top:6px" onclick="Sig.clear()">Clear signature</button>
+
+  <!-- full-screen signing surface -->
+  <div id="sigOverlay" style="display:none;position:fixed;inset:0;background:#0A3A64;z-index:2000;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;color:#fff">
+      <b id="sigWho" style="font-size:14px">Borrower signature</b>
+      <span style="font-size:11px;opacity:.75">Sign with your finger — rotate the phone for more room</span>
+    </div>
+    <div style="flex:1;padding:0 10px 4px;display:flex">
+      <canvas id="sigBig" style="flex:1;background:#fff;border-radius:12px;touch-action:none;width:100%;height:100%"></canvas>
+    </div>
+    <div style="display:flex;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom))">
+      <button class="btn btn--ghost" style="flex:1;background:#fff" onclick="Sig.wipe()">Clear</button>
+      <button class="btn btn--ghost" style="flex:1;background:#fff" onclick="Sig.close(false)">Cancel</button>
+      <button class="btn" style="flex:2;background:#D4AF37;color:#0A3560;font-weight:700" onclick="Sig.close(true)">✓ Done</button>
+    </div>
+  </div>
   <div class="row" style="margin-top:16px">
     <button class="btn btn--ghost" onclick="App.close('mCollect')">Cancel</button>
     <button class="btn btn--gold" id="cBtn" onclick="App.collect()">Collect &amp; issue receipt</button>
@@ -651,9 +670,8 @@ const App = {
       label:'Payment ₱'+amt+(pen>0?' +pen ₱'+pen:'')+' — '+(c.Name||c.LoanID),
       payload:{ LoanID:c.LoanID, AmountPaid:amt, PenaltyAmount:pen, PaymentMethod:v('cMethod'),
         ReferenceNo:(v('cRef')||'')+(prv?' ['+prv+']':''), Lat:gps.lat, Lng:gps.lng, Accuracy:gps.acc, GeoReason:'PWA' } });
-    if(Sig.dirty){
-      try{ App.S.outbox[App.S.outbox.length-1].signature =
-        el('sigPad').toDataURL('image/png').split(',')[1]; }catch(e){}
+    if(Sig.dirty&&Sig.data){
+      try{ App.S.outbox[App.S.outbox.length-1].signature = Sig.data.split(',')[1]; }catch(e){}
     }
     App.S.receipts.unshift({ prv, or:'', amt:amt+pen, name:c.Name||c.LoanID, loan:c.LoanID,
       at:new Date().toISOString(), ref });
@@ -979,22 +997,52 @@ function toast(msg, err){
   clearTimeout(TT); TT=setTimeout(()=>t.style.display='none', 3800);
 }
 
-/* signature pad */
-const Sig={ dirty:false, ctx:null,
-  init(){ const cv=el('sigPad'); if(!cv) return;
-    Sig.ctx=cv.getContext('2d'); Sig.ctx.lineWidth=3; Sig.ctx.lineCap='round'; Sig.ctx.strokeStyle='#1C2B3A';
-    let draw=false;
-    const pos=e=>{ const r=cv.getBoundingClientRect();
-      return { x:(e.clientX-r.left)*cv.width/r.width, y:(e.clientY-r.top)*cv.height/r.height }; };
-    cv.addEventListener('pointerdown',e=>{ draw=true; const p=pos(e);
-      Sig.ctx.beginPath(); Sig.ctx.moveTo(p.x,p.y); e.preventDefault(); });
-    cv.addEventListener('pointermove',e=>{ if(!draw) return; const p=pos(e);
-      Sig.ctx.lineTo(p.x,p.y); Sig.ctx.stroke(); Sig.dirty=true; e.preventDefault(); });
-    ['pointerup','pointerleave'].forEach(x=>cv.addEventListener(x,()=>draw=false));
+/* signature — full-screen capture, thumbnail in the form, DPI-crisp strokes */
+const Sig={ dirty:false, data:'', ctx:null, bound:false, drew:false,
+  open(){
+    const ov=el('sigOverlay'); ov.style.display='flex';
+    const who=el('cName')||el('cWho'); if(el('sigWho')&&who&&who.textContent) el('sigWho').textContent='Signature — '+who.textContent;
+    requestAnimationFrame(()=>Sig.fit());
+    if(!Sig.bound){
+      Sig.bind();
+      window.addEventListener('resize',()=>{ if(el('sigOverlay').style.display==='flex') Sig.fit(); });
+      Sig.bound=true;
+    }
   },
-  clear(){ if(Sig.ctx){ Sig.ctx.clearRect(0,0,600,200); } Sig.dirty=false; }
+  fit(){
+    const cv=el('sigBig'), r=cv.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+    const keep=Sig.drew?cv.toDataURL():null;
+    cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr);
+    Sig.ctx=cv.getContext('2d'); Sig.ctx.scale(dpr,dpr);
+    Sig.ctx.lineWidth=3.2; Sig.ctx.lineCap='round'; Sig.ctx.lineJoin='round'; Sig.ctx.strokeStyle='#1C2B3A';
+    if(keep){ const im=new Image(); im.onload=()=>Sig.ctx.drawImage(im,0,0,r.width,r.height); im.src=keep; }
+  },
+  bind(){
+    const cv=el('sigBig'); let draw=false;
+    const pos=e=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+    cv.addEventListener('pointerdown',e=>{ draw=true; Sig.drew=true; const p=pos(e);
+      Sig.ctx.beginPath(); Sig.ctx.moveTo(p.x,p.y); cv.setPointerCapture(e.pointerId); e.preventDefault(); });
+    cv.addEventListener('pointermove',e=>{ if(!draw) return; const p=pos(e);
+      Sig.ctx.lineTo(p.x,p.y); Sig.ctx.stroke(); e.preventDefault(); });
+    ['pointerup','pointercancel'].forEach(x=>cv.addEventListener(x,()=>draw=false));
+  },
+  wipe(){ const cv=el('sigBig'); if(Sig.ctx) Sig.ctx.clearRect(0,0,cv.width,cv.height); Sig.drew=false; },
+  close(save){
+    const ov=el('sigOverlay');
+    if(save&&Sig.drew){
+      const cv=el('sigBig');
+      Sig.data=cv.toDataURL('image/png'); Sig.dirty=true;
+      const t=el('sigThumb'); t.src=Sig.data; t.style.display='block';
+      el('sigHint').style.display='none';
+    }
+    ov.style.display='none';
+  },
+  clear(){ Sig.dirty=false; Sig.data=''; Sig.drew=false;
+    const t=el('sigThumb'); if(t){ t.style.display='none'; t.src=''; }
+    if(el('sigHint')) el('sigHint').style.display='inline';
+    if(Sig.ctx){ const cv=el('sigBig'); Sig.ctx.clearRect(0,0,cv.width,cv.height); }
+  }
 };
-Sig.init();
 App.boot();
 </script>
 </body>
