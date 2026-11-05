@@ -1359,7 +1359,15 @@ var Forms = (function(){
 
   /* ---------- misc ---------- */
   /* Server calls: google.script.run inside Apps Script pages; the JSON API (doPost) from the installable app. */
-  F.apiUrl = function(){ try{ return localStorage.getItem('esign_api')||''; }catch(e){ return ''; } };
+  F.API_RE = /^(https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec|https:\/\/script\.google\.com\/a\/macros\/[A-Za-z0-9.-]+\/s\/[A-Za-z0-9_-]+\/exec|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/exec)$/;
+  F.DEFAULT_API = '';   /* filled by scripts/build-pwa.py --api; empty = ask on first launch */
+  F.setApiUrl = function(u){ u=String(u||'').trim(); if(!F.API_RE.test(u)) return false; try{ localStorage.setItem('esign_api',u); }catch(e){} F._api=u; return true; };
+  F.apiUrl = function(){
+    try{ var q=new URLSearchParams(location.search).get('api'); if(q && F.setApiUrl(q)) return q; }catch(e){}
+    if(F._api) return F._api;
+    try{ var v=localStorage.getItem('esign_api'); if(v) return v; }catch(e){}
+    return F.API_RE.test(F.DEFAULT_API) ? F.DEFAULT_API : '';
+  };
   F.call = function(fn){
     var args=Array.prototype.slice.call(arguments,1);
     if(typeof google!=='undefined' && google.script && google.script.run){
@@ -1369,7 +1377,7 @@ var Forms = (function(){
       });
     }
     var url=F.apiUrl();
-    if(!url) return Promise.reject(new Error('The app is not connected to ERMANO e-Sign yet. Open Settings and paste the web app URL.'));
+    if(!url) return Promise.reject(new Error('NO_SERVER'));
     return fetch(url,{ method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({fn:fn, args:args}) })
       .then(function(r){ return r.text().then(function(t){ var x; try{ x=JSON.parse(t); }catch(e){ throw new Error('The server did not answer as expected (HTTP '+r.status+'). Check the web app URL and that the deployment allows "Anyone".'); } if(x&&x.ok) return x.data; throw new Error((x&&x.error)||'Server error'); }); })
       .catch(function(e){ if(e instanceof TypeError) throw new Error('No connection. Check your internet and the web app URL.'); throw e; });
@@ -1481,13 +1489,15 @@ var Forms = (function(){
   $('verifyBtn').addEventListener('click',openDocs);
   $('otp').addEventListener('keydown',function(e){ if(e.key==='Enter') openDocs(); });
 
+  function friendly(e){ return e && e.message==='NO_SERVER' ? 'This signing link is incomplete. Please ask your ERMANO loan officer to send the link again.' : (e && e.message) || 'Something went wrong.'; }
+  if(!TOKEN){ $('loading').hidden=true; $('blocked').hidden=false; $('blockedMsg').textContent='Open this page from the signing link ERMANO Lending sent to your phone.'; return; }
   Forms.call('borrowerPeek', TOKEN).then(function(d){
     st.expiresAt=d.expiresAt; st.offset=new Date(d.serverNow).getTime()-Date.now(); st.roles=d.roles;
     $('loading').hidden=true;
-    if(!d.needsOtp){ Forms.call('borrowerOpen', TOKEN, '').then(opened).catch(function(e){ $('blocked').hidden=false; $('blockedMsg').textContent=e.message; }); return; }
+    if(!d.needsOtp){ Forms.call('borrowerOpen', TOKEN, '').then(opened).catch(function(e){ $('blocked').hidden=false; $('blockedMsg').textContent=friendly(e); }); return; }
     $('verifyMsg').textContent='Enter the 6-digit code ERMANO Lending sent to your mobile number'+(d.mobileHint?' ending '+d.mobileHint.replace('•••• ',''):'')+'. Signing as: '+d.roleLabels.filter(function(x){ return !/handwriting/.test(x); }).join(', ')+'.';
     $('verify').hidden=false; $('otp').focus(); tick();
-  }).catch(function(e){ $('loading').hidden=true; $('blocked').hidden=false; $('blockedMsg').textContent=e.message; });
+  }).catch(function(e){ $('loading').hidden=true; $('blocked').hidden=false; $('blockedMsg').textContent=friendly(e); });
 })();
 </script>
 <script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
